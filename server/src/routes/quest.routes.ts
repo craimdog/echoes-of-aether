@@ -1,7 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import * as questService from '../services/quest.service.js';
-import { streamQuestResponse } from '../services/ai.service.js';
+import { streamQuestResponse, getSessionMessages } from '../services/ai.service.js';
 import { prisma } from '../lib/prisma.js';
 import { buildSystemPrompt } from '../services/prompt-builder.js';
 import { SOCKET_EVENTS } from '@aether/shared';
@@ -95,6 +95,12 @@ const questRoutes: FastifyPluginAsync = async (fastify) => {
     });
     if (!session) return reply.status(404).send({ success: false, error: 'Session not found', code: 'NOT_FOUND' });
     return reply.send({ success: true, data: session });
+  });
+
+  fastify.get('/:sessionId/messages', async (req, reply) => {
+    const { sessionId } = req.params as { sessionId: string };
+    const messages = await getSessionMessages(sessionId);
+    return reply.send({ success: true, data: { messages } });
   });
 };
 

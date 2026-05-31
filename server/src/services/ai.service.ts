@@ -61,6 +61,11 @@ export async function streamQuestResponse(
     });
 
     let fullText = '';
+    let streamBuffer = '';
+    let mutationStarted = false;
+    const MUTATION_MARKER = '```json';
+    const LOOKAHEAD = MUTATION_MARKER.length - 1;
+
     for await (const event of stream) {
         if (
             event.type === 'content_block_delta' &&
@@ -68,9 +73,24 @@ export async function streamQuestResponse(
         ) {
             const chunk = event.delta.text;
             fullText += chunk;
-            onChunk(chunk);
+
+            if (mutationStarted) continue;
+
+            streamBuffer += chunk;
+            const mutIdx = streamBuffer.indexOf(MUTATION_MARKER);
+
+            if (mutIdx !== -1) {
+                mutationStarted = true;
+                const safe = streamBuffer.slice(0, mutIdx).trimEnd();
+                if (safe) onChunk(safe);
+            } else if (streamBuffer.length > LOOKAHEAD) {
+                onChunk(streamBuffer.slice(0, -LOOKAHEAD));
+                streamBuffer = streamBuffer.slice(-LOOKAHEAD);
+            }
         }
     }
+
+    if (!mutationStarted && streamBuffer) onChunk(streamBuffer);
 
     const { clean, mutation } = extractMutation(fullText);
     history.push({ role: 'assistant', content: clean });
