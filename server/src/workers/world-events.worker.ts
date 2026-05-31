@@ -81,7 +81,7 @@ export function startWorldEventsWorker() {
     { connection },
   );
 
-  worker.on('failed', (job, err) => {
+  worker.on('failed', (job, err: Error) => {
     console.error(`World events job ${job?.id} failed:`, err.message);
   });
 

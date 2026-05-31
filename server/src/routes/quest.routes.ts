@@ -32,6 +32,8 @@ const questRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post('/input', async (req, reply) => {
     const { sessionId, characterId, questId, input } = inputSchema.parse(req.body);
 
+    const charMeta = await prisma.character.findFirst({ where: { id: characterId }, select: { zoneId: true } });
+
     const [character, quest, recentEvents, loreFragments] = await Promise.all([
         prisma.character.findFirst({
             where: { id: characterId, deletedAt: null },
@@ -42,13 +44,12 @@ const questRoutes: FastifyPluginAsync = async (fastify) => {
             include: { zone: true },
         }),
         prisma.worldEvent.findMany({
-            where: { zoneId: (await prisma.character.findFirst({ where: { id: characterId }, select: { zoneId: true } }))?.zoneId ?? '' },
+            where: { zoneId: charMeta?.zoneId ?? '' },
             orderBy: { createdAt: 'desc' },
             take: 5,
             select: { description: true, createdAt: true },
         }),
-        prisma.character.findFirst({ where: { id: characterId }, select: { zoneId: true } })
-            .then(c => c ? getRelevantLore(c.zoneId, quest?.title ?? '') : []),
+        charMeta ? getRelevantLore(charMeta.zoneId, questId) : Promise.resolve([]),
     ]);
 
     if (!character || !quest) {
