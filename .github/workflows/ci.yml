@@ -33,7 +33,7 @@ jobs:
         run: npm run typecheck --workspace=server
 
       - name: Typecheck client
-        run: npm run typecheck --workspace=client
+        run: cd client && npx tsc --noEmit -p tsconfig.app.json
 
   build:
     name: Build
