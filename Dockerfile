@@ -17,4 +17,4 @@ RUN cd server && npx prisma generate
 RUN npm run build --workspace=server
 
 EXPOSE 3001
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=server/prisma/schema.prisma && node server/dist/index.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=server/prisma/schema.prisma && node server/dist/src/index.js"]
