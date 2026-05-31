@@ -43,7 +43,7 @@ await server.register(questRoutes, { prefix: '/api/v1/quest' });
 await server.register(adminRoutes, {prefix: '/api/v1/admin' });
 await server.register(guildRoutes, {prefix: '/api/v1/guilds' });
 
-startWorldEventsWorker();
+startWorldEventsWorker(server.io);
 
 server.get('/health', async () => ({ status: 'ok' }));
 

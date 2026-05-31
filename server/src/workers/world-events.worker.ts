@@ -1,8 +1,27 @@
 import { Worker } from 'bullmq';
 import { prisma } from '../lib/prisma.js';
 import type { WorldMutationJobData } from '../jobs/world-mutation.job.js';
+import type { Server } from 'socket.io';
 
-const connection = { host: 'localhost', port: 6379 };
+const CLASS_HP_MP: Record<string, { hp: number; mp: number }> = {
+  MAGE:    { hp: 60,  mp: 120 },
+  RANGER:  { hp: 80,  mp: 60  },
+  PALADIN: { hp: 120, mp: 40  },
+  ROGUE:   { hp: 70,  mp: 50  },
+};
+
+function getConnection() {
+  if (process.env.REDIS_URL) {
+    const url = new URL(process.env.REDIS_URL);
+    return {
+      host: url.hostname,
+      port: parseInt(url.port) || 6379,
+      password: url.password || undefined,
+      tls: url.protocol === 'rediss:' ? ({} as object) : undefined,
+    };
+  }
+  return { host: 'localhost', port: 6379 };
+}
 
 function describeMutation(type: string, payload: Record<string, unknown>): string {
   switch (type) {
@@ -14,20 +33,29 @@ function describeMutation(type: string, payload: Record<string, unknown>): strin
   }
 }
 
-export function startWorldEventsWorker() {
+export function startWorldEventsWorker(io: Server) {
   const worker = new Worker<WorldMutationJobData>(
     'world-events',
     async (job) => {
       const { mutation, triggeredByCharId } = job.data;
       const { type, zoneId, payload } = mutation;
 
-      await prisma.worldEvent.create({
+      const zone = await prisma.zone.findUnique({ where: { id: zoneId }, select: { name: true } });
+
+      const worldEvent = await prisma.worldEvent.create({
         data: {
           zoneId,
           description: describeMutation(type, payload),
           triggeredByCharId: triggeredByCharId ?? null,
           processed: false,
         },
+      });
+
+      // Broadcast to world feed
+      io.emit('world:event', {
+        description: worldEvent.description,
+        zoneId,
+        zoneName: zone?.name ?? 'Unknown',
       });
 
       switch (type) {
@@ -66,19 +94,34 @@ export function startWorldEventsWorker() {
             });
           }
           if ((xpGained || goldGained) && triggeredByCharId) {
-            await prisma.character.update({
+            const updated = await prisma.character.update({
               where: { id: triggeredByCharId },
               data: {
                 xp: { increment: xpGained ?? 0 },
                 gold: { increment: goldGained ?? 0 },
               },
             });
+
+            const xpForNextLevel = updated.level * 150;
+            if (updated.xp >= xpForNextLevel) {
+              const stats = CLASS_HP_MP[updated.class] ?? { hp: 10, mp: 10 };
+              await prisma.character.update({
+                where: { id: triggeredByCharId },
+                data: {
+                  level: { increment: 1 },
+                  hp: { increment: Math.floor(stats.hp * 0.1) },
+                  mp: { increment: Math.floor(stats.mp * 0.1) },
+                },
+              });
+            }
           }
           break;
         }
       }
+
+      await prisma.worldEvent.update({ where: { id: worldEvent.id }, data: { processed: true } });
     },
-    { connection },
+    { connection: getConnection() },
   );
 
   worker.on('failed', (job, err: Error) => {

@@ -1,6 +1,7 @@
 import type { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import * as characterService from '../services/character.service.js';
+import { prisma } from '../lib/prisma.js';
 
 const createSchema = z.object({
     name: z.string().min(2).max(30),
@@ -34,6 +35,16 @@ const characterRoutes: FastifyPluginAsync = async (fastify) => {
         const { id } = req.params as { id: string };
         await characterService.deleteCharacter(id, req.user.id);
         return reply.status(204).send();
+    });
+
+    fastify.get('/:id/active-session', async (req) => {
+        const { id } = req.params as { id: string };
+        const session = await prisma.questSession.findFirst({
+            where: { characterId: id, status: 'ACTIVE' },
+            orderBy: { startedAt: 'desc' },
+            select: { id: true, questId: true },
+        });
+        return { success: true, data: { session } };
     });
 };
 

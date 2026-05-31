@@ -15,7 +15,7 @@ interface QuestState {
     addPlayerMessage: (content: string) => void;
     startNarratorMessage: () => void;
     appendChunk: (chunk: string) => void;
-    finalizeNarratorMessage: () => void;
+    finalizeNarratorMessage: (cleanText?: string | null) => void;
 }
 
 export const useQuestStore = create<QuestState>((set) => ({
@@ -43,11 +43,17 @@ export const useQuestStore = create<QuestState>((set) => ({
             return { messages: msgs };
         }),
 
-    finalizeNarratorMessage: () =>
+    finalizeNarratorMessage: (cleanText) =>
         set((s) => {
             const msgs = [...s.messages];
             const last = msgs[msgs.length - 1];
-            if (last?.streaming) msgs[msgs.length - 1] = { ...last, streaming: false };
+            if (last?.streaming) {
+                msgs[msgs.length - 1] = {
+                    ...last,
+                    content: cleanText ?? last.content,
+                    streaming: false,
+                };
+            }
             return { messages: msgs, streaming: false };
         }),
 }));

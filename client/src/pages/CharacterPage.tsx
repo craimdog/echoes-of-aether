@@ -2,10 +2,12 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import ZoneChat from '../components/ZoneChat';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function CharacterPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: charData, isLoading } = useQuery({
     queryKey: ['character', id],
@@ -24,12 +26,22 @@ export default function CharacterPage() {
     enabled: !!charData?.zoneId,
   });
 
+  const { data: activeSessionData } = useQuery({
+    queryKey: ['active-session', id],
+    queryFn: async () => {
+      const res = await api.get(`/api/v1/characters/${id}/active-session`);
+      return res.data.data.session as { id: string; questId: string } | null;
+    },
+    enabled: !!id,
+  });
+
   const startQuest = useMutation({
     mutationFn: async (questId: string) => {
       const res = await api.post('/api/v1/quest/start', { characterId: id, questId });
       return res.data.data.sessionId as string;
     },
     onSuccess: (sessionId) => {
+      queryClient.invalidateQueries({ queryKey: ['active-session', id] });
       navigate(`/quest/${sessionId}?characterId=${id}`);
     },
   });
@@ -97,13 +109,22 @@ export default function CharacterPage() {
                       Reward: <span className="text-indigo-400">{quest.rewardXp} XP</span> · <span className="text-yellow-400">{quest.rewardGold} Gold</span>
                     </p>
                   </div>
-                  <button
-                    onClick={() => startQuest.mutate(quest.id)}
-                    disabled={startQuest.isPending}
-                    className="shrink-0 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
-                  >
-                    {startQuest.isPending ? '...' : 'Begin'}
-                  </button>
+                  {activeSessionData?.questId === quest.id ? (
+                    <button
+                      onClick={() => navigate(`/quest/${activeSessionData!.id}?characterId=${id}`)}
+                      className="shrink-0 bg-green-700 hover:bg-green-600 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
+                    >
+                      Resume
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => startQuest.mutate(quest.id)}
+                      disabled={startQuest.isPending || !!activeSessionData}
+                      className="shrink-0 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
+                    >
+                      {startQuest.isPending ? '...' : 'Begin'}
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
