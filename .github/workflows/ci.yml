@@ -52,5 +52,18 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build all
-        run: npm run build
+      - name: Build shared
+        run: npm run build --workspace=shared
+
+      - name: Generate Prisma Client
+        run: cd server && npx prisma generate
+
+      - name: Build server
+        run: npm run build --workspace=server
+
+      - name: Build client
+        run: npm run build --workspace=client
+        env:
+          VITE_API_URL: https://placeholder.example.com
+          VITE_WS_URL: https://placeholder.example.com
+          NODE_OPTIONS: --max-old-space-size=4096
