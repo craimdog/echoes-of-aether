@@ -2,6 +2,7 @@ FROM node:22-alpine AS base
 WORKDIR /app
 
 COPY package*.json ./
+COPY tsconfig.base.json ./
 COPY shared/package*.json ./shared/
 COPY server/package*.json ./server/
 COPY server/prisma ./server/prisma/
