@@ -39,7 +39,6 @@ export default function WorldMapPage() {
     useEffect(() => {
         const socket = getSocket();
         connectSocket();
-        socket.join?.('world');
         socket.emit('world:join');
 
         socket.on('world:event', (payload: { zoneName: string; description: string }) => {
