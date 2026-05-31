@@ -13,10 +13,12 @@ const loginSchema = z.object({
     password: z.string().min(1),
 });
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const cookieOpts = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
+    secure: isProd,
+    sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
     path: '/',
 };
 
