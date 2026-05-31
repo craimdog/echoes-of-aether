@@ -1,0 +1,166 @@
+generator client {
+    provider = "prisma-client-js"
+    previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+    provider = "postgresql"
+    url = env("DATABASE_URL")
+    extensions = [pgvector(map: "vector")]
+}
+
+enum Role {
+    PLAYER
+    ADMIN
+}
+
+enum Class {
+    MAGE
+    RANGER
+    PALADIN
+    ROGUE
+}
+
+enum GuildRole {
+    MASTER
+    OFFICER
+    MEMBER
+}
+
+enum QuestStatus {
+    ACTIVE
+    COMPLETED
+    FAILED
+    ABANDONED
+}
+
+model User {
+    id           String      @id @default(cuid())
+    email        String      @unique
+    passwordHash String
+    username     String      @unique
+    role         Role        @default(PLAYER)
+    characters   Character[]
+    createdAt    DateTime    @default(now())
+    updatedAt    DateTime    @updatedAt
+}
+
+model Character {
+    id String @id @default(cuid())
+    userId String
+    user User @relation(fields: [userId], references: [id])
+    name String
+    class Class
+    level Int @default(1)
+    xp Int @default(0)
+    hp Int
+    mp Int
+    gold Int @default(100)
+    inventory Json @default("[]")
+    isAlive Boolean @default(true)
+    deletedAt DateTime?
+    zoneId String
+    zone Zone @relation(fields: [zoneId], references: [id])
+    factionId String?
+    faction Faction? @relation(fields: [factionId], references: [id])
+    sessions QuestSession[]
+    guildMembership GuildMember?
+    worldEvents WorldEvent[]
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Zone {
+    id String @id @default(cuid())
+    name String @unique
+    lore String
+    threatLevel Int @default(1)
+    factionControlId String?
+    faction Faction? @relation(fields: [factionControlId], references: [id])
+    quests Quest[]
+    characters Character[]
+    worldEvents WorldEvent[]
+    loreFragments LoreFragment[]
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Faction {
+    id String @id @default(cuid())
+    name String @unique
+    description String
+    color String
+    globalPower Int @default(0)
+    characters Character[]
+    zones Zone[]
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model Quest {
+    id String @id @default(cuid())
+    zoneId String
+    zone Zone @relation(fields: [zoneId], references: [id])
+    title String
+    briefing String
+    rewardXp Int
+    rewardGold Int
+    isActive Boolean @default(true)
+    sessions QuestSession[]
+    createdAt DateTime @default(now())
+}
+
+model QuestSession {
+    id String @id @default(cuid())
+    characterId String
+    character Character @relation(fields: [characterId], references: [id])
+    questId String
+    quest Quest @relation(fields: [questId], references: [id])
+    status QuestStatus @default(ACTIVE)
+    startedAt DateTime @default(now())
+    endedAt DateTime?
+}
+
+model WorldEvent {
+    id String @id @default(cuid())
+    zoneId String
+    zone Zone @relation(fields: [zoneId], references: [id])
+    description String
+    triggeredByCharId String?
+    triggeredBy Character? @relation(fields: [triggeredByCharId], references: [id])
+    processed Boolean @default(false)
+    createdAt DateTime @default(now())
+}
+
+model LoreFragment {
+    id String @id @default(cuid())
+    zoneId String
+    zone Zone @relation(fields: [zoneId], references: [id])
+    content String
+    embedding Unsupported("vector(1536)")?
+    createdAt DateTime @default(now())
+}
+
+model Guild {
+    id String @id @default(cuid())
+    name String @unique
+    founderId String
+    emblemColor String
+    description String @default("")
+    xpPool Int @default(0)
+    tier Int @default(1)
+    members GuildMember[]
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+}
+
+model GuildMember {
+    guildId String
+    guild Guild @relation(fields: [guildId], references: [id])
+    characterId String @unique
+    character Character @relation(fields: [characterId], references: [id])
+    role GuildRole @default(MEMBER)
+    joinedAt DateTime @default(now())
+
+    @@id([guildId, characterId])    
+}
