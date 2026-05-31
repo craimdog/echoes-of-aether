@@ -61,6 +61,8 @@ async function main() {
         { zoneName: 'The Ember Peaks',     title: 'The Forge-Clan Silence',    briefing: 'The dwarven forge-clan of Kragmoor has gone silent for 12 days. No smoke rises from their vents.',           rewardXp: 160, rewardGold: 110 },
         { zoneName: 'The Amber Fields',    title: 'The Stopped Clock',         briefing: 'In a village preserved by the stasis field, the same day has been repeating. The villagers don\'t know.',     rewardXp: 100, rewardGold: 80  },
         { zoneName: 'The Shattered Spire', title: 'Echo of the Archmage',      briefing: 'A magical echo of the Spire\'s last archmage is still active in the ruins, repeating a warning no one has decoded.', rewardXp: 200, rewardGold: 150 },
+        { zoneName: 'Deepwater Hollow',    title: 'The Drowned Signal',        briefing: 'A rhythmic pulse has been emanating from the deepest cave system. Divers who investigated have not resurfaced.',   rewardXp: 150, rewardGold: 100 },
+        { zoneName: 'The Silver Reaches',  title: 'The Waking Colossus',       briefing: 'Tremors beneath the tundra are growing stronger. Something ancient beneath the ice is beginning to stir.',          rewardXp: 170, rewardGold: 120 },
     ];
 
     for (const q of quests) {

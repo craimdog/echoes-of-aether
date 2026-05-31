@@ -67,8 +67,8 @@ const questRoutes: FastifyPluginAsync = async (fastify) => {
       (chunk) => {
         fastify.io.to(`quest:${sessionId}`).emit(SOCKET_EVENTS.QUEST_CHUNK, { sessionId, chunk });
       },
-    ).then(async ({ mutation }) => {
-        fastify.io.to(`quest:${sessionId}`).emit(SOCKET_EVENTS.QUEST_END, { sessionId, mutation });
+    ).then(async ({ fullText, mutation }) => {
+        fastify.io.to(`quest:${sessionId}`).emit(SOCKET_EVENTS.QUEST_END, { sessionId, mutation, cleanText: fullText });
         if (mutation) {
             await worldEventsQueue.add('world-mutation', {
                 mutation,
@@ -77,6 +77,7 @@ const questRoutes: FastifyPluginAsync = async (fastify) => {
         }
     }).catch((err) => {
       fastify.log.error(err, 'Quest stream error');
+      fastify.io.to(`quest:${sessionId}`).emit(SOCKET_EVENTS.QUEST_END, { sessionId, mutation: null, cleanText: null });
     });
   });
 
