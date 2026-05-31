@@ -7,8 +7,6 @@ const sessionKey = (id: string) => `quest-session:${id}`;
 
 type Message = { role: 'user' | 'assistant'; content: string };
 
-const MUTATION_REGEX = /```json\s*(\{[\s\S]*?"worldMutation"[\s\S]*?\})\s*```/;
-
 export async function getSessionMessages(sessionId: string): Promise<Message[]> {
     const raw = await redis.get(sessionKey(sessionId));
     return raw ? (JSON.parse(raw) as Message[]) : [];
@@ -23,13 +21,24 @@ export async function saveSessionMessages(sessionId: string, messages: Message[]
     );
 }
 
-export function extractMutation(text: string): { clean: string, mutation: WorldMutation | null } {
-    const match = MUTATION_REGEX.exec(text);
-    if (!match) return { clean: text, mutation: null };
+export function extractMutation(text: string): { clean: string; mutation: WorldMutation | null } {
+    const startMarker = '```json';
+    const endMarker = '```';
+
+    const startIdx = text.indexOf(startMarker);
+    if (startIdx === -1) return { clean: text, mutation: null };
+
+    const jsonStart = startIdx + startMarker.length;
+    const endIdx = text.indexOf(endMarker, jsonStart);
+    if (endIdx === -1) return { clean: text, mutation: null };
+
+    const jsonStr = text.slice(jsonStart, endIdx).trim();
+    const fullBlock = text.slice(startIdx, endIdx + endMarker.length);
+
     try {
-        const parsed = JSON.parse(match[1]) as { worldMutation: WorldMutation };
-        const clean = text.replace(match[0], '').trim();
-        return { clean, mutation: parsed.worldMutation };
+        const parsed = JSON.parse(jsonStr) as { worldMutation: WorldMutation };
+        if (!parsed.worldMutation) return { clean: text, mutation: null };
+        return { clean: text.replace(fullBlock, '').trim(), mutation: parsed.worldMutation };
     } catch {
         return { clean: text, mutation: null };
     }
