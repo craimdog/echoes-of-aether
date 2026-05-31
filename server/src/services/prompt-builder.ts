@@ -1,13 +1,14 @@
-import type { Character, Zone, Faction, Quest, WorldEvent } from '@prisma/client';
+import type { Prisma } from '@prisma/client';
 
-type CharacterWithRelations = Character & {
-  zone: Zone & { faction: Faction | null };
-  faction: Faction | null;
-};
+type CharacterWithRelations = Prisma.CharacterGetPayload<{
+  include: { zone: { include: { faction: true } }; faction: true };
+}>;
 
-type QuestWithZone = Quest & { zone: Zone };
+type QuestWithZone = Prisma.QuestGetPayload<{
+  include: { zone: true };
+}>;
 
-type WorldEventBasic = Pick<WorldEvent, 'description' | 'createdAt'>;
+type WorldEventBasic = Pick<Prisma.WorldEventGetPayload<object>, 'description' | 'createdAt'>;
 
 export function buildSystemPrompt(
   character: CharacterWithRelations,

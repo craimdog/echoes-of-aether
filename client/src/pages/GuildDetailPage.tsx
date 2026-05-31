@@ -92,7 +92,6 @@ export default function GuildDetailPage() {
         <div className="space-y-2 mb-6">
           {guild.members.map((m: any) => {
             const isMe = m.character?.userId === user?.id || characters?.some((c: any) => c.id === m.characterId);
-            const myChar = myMemberships.find((c: any) => c.id === m.characterId);
             return (
               <div key={m.characterId} className="bg-gray-900 border border-gray-800 rounded-lg px-4 py-3 flex items-center gap-3">
                 <div className="flex-1">

@@ -1,5 +1,12 @@
 import { prisma } from '../lib/prisma.js';
+import { Prisma } from '@prisma/client';
 import { CHARACTER_LIMITS } from '@aether/shared';
+
+function httpError(message: string, statusCode: number): Error & { statusCode: number } {
+    const err = new Error(message) as Error & { statusCode: number };
+    err.statusCode = statusCode;
+    return err;
+}
 
 export async function createGuild(
     userId: string,
@@ -12,18 +19,18 @@ export async function createGuild(
         where: { id: characterId, userId, deletedAt: null, isAlive: true },
         include: { guildMembership: true },
     });
-    if (!character) throw Object.assign(new Error('Character not found'), { statusCode: 404 });
+    if (!character) throw httpError('Character not found', 404);
     if (character.level < CHARACTER_LIMITS.guildFoundMinLevel) {
-        throw Object.assign(new Error(`Character must be level ${CHARACTER_LIMITS.guildFoundMinLevel} to found a guild`), { statusCode: 400 });
+        throw httpError(`Character must be level ${CHARACTER_LIMITS.guildFoundMinLevel} to found a guild`, 400);
     }
     if (character.gold < CHARACTER_LIMITS.guildFoundGoldCost) {
-        throw Object.assign(new Error(`Founding a guild costs ${CHARACTER_LIMITS.guildFoundGoldCost} gold`), { statusCode: 400 });
+        throw httpError(`Founding a guild costs ${CHARACTER_LIMITS.guildFoundGoldCost} gold`, 400);
     }
     if (character.guildMembership) {
-        throw Object.assign(new Error('Character is already in a guild'), { statusCode: 400 });
+        throw httpError('Character is already in a guild', 400);
     }
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         const guild = await tx.guild.create({
             data: {
                 name,
@@ -63,7 +70,7 @@ export async function getGuild(id: string) {
             },
         },
     });
-    if (!guild) throw Object.assign(new Error('Guild not found'), { statusCode: 404 });
+    if (!guild) throw httpError('Guild not found', 404);
     return guild;
 }
 
@@ -72,11 +79,11 @@ export async function joinGuild(userId: string, characterId: string, guildId: st
         where: { id: characterId, userId, deletedAt: null },
         include: { guildMembership: true },
     });
-    if (!character) throw Object.assign(new Error('Character not found'), { statusCode: 404 });
-    if (character.guildMembership) throw Object.assign(new Error('Already in a guild'), { statusCode: 400 });
+    if (!character) throw httpError('Character not found', 404);
+    if (character.guildMembership) throw httpError('Already in a guild', 400);
 
     const guild = await prisma.guild.findUnique({ where: { id: guildId } });
-    if (!guild) throw Object.assign(new Error('Guild not found'), { statusCode: 404 });
+    if (!guild) throw httpError('Guild not found', 404);
 
     return prisma.guildMember.create({
         data: { guildId, characterId, role: 'MEMBER' },
@@ -88,9 +95,9 @@ export async function leaveGuild(userId: string, characterId: string, guildId: s
     const membership = await prisma.guildMember.findFirst({
         where: { characterId, guildId, character: { userId } },
     });
-    if (!membership) throw Object.assign(new Error('Not a member of this guild'), { statusCode: 404 });
+    if (!membership) throw httpError('Not a member of this guild', 404);
     if (membership.role === 'MASTER') {
-        throw Object.assign(new Error('Guild master must disband the guild or transfer leadership'), { statusCode: 400 });
+        throw httpError('Guild master must disband the guild or transfer leadership', 400);
     }
     return prisma.guildMember.delete({ where: { guildId_characterId: { guildId, characterId } } });
 }
@@ -100,11 +107,11 @@ export async function kickMember(userId: string, actorCharId: string, guildId: s
         where: { characterId: actorCharId, guildId, character: { userId } },
     });
     if (!actor || (actor.role !== 'MASTER' && actor.role !== 'OFFICER')) {
-        throw Object.assign(new Error('Insufficient permissions'), { statusCode: 403 });
+        throw httpError('Insufficient permissions', 403);
     }
     const target = await prisma.guildMember.findFirst({ where: { characterId: targetCharId, guildId } });
-    if (!target) throw Object.assign(new Error('Member not found'), { statusCode: 404 });
-    if (target.role === 'MASTER') throw Object.assign(new Error('Cannot kick the guild master'), { statusCode: 400 });
+    if (!target) throw httpError('Member not found', 404);
+    if (target.role === 'MASTER') throw httpError('Cannot kick the guild master', 400);
 
     return prisma.guildMember.delete({ where: { guildId_characterId: { guildId, characterId: targetCharId } } });
 }
@@ -113,7 +120,7 @@ export async function disbandGuild(userId: string, characterId: string, guildId:
     const membership = await prisma.guildMember.findFirst({
         where: { characterId, guildId, role: 'MASTER', character: { userId } },
     });
-    if (!membership) throw Object.assign(new Error('Only the guild master can disband'), { statusCode: 403 });
+    if (!membership) throw httpError('Only the guild master can disband', 403);
 
     return prisma.$transaction([
         prisma.guildMember.deleteMany({ where: { guildId } }),
