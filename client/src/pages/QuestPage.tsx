@@ -23,6 +23,7 @@ export default function QuestPage() {
 
   const [input, setInput] = useState('');
   const [questId, setQuestId] = useState('');
+  const [questInfo, setQuestInfo] = useState<any>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const openingFired = useRef(false);
   const streamTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -75,8 +76,10 @@ export default function QuestPage() {
   useEffect(() => {
     if (!sessionId) return;
     api.get(`/api/v1/quest/${sessionId}`).then(async res => {
-      const qId = res.data.data.questId as string;
+      const data = res.data.data;
+      const qId = data.questId as string;
       setQuestId(qId);
+      setQuestInfo(data.quest);
 
       const histRes = await api.get(`/api/v1/quest/${sessionId}/messages`);
       const history: { role: 'user' | 'assistant'; content: string }[] = histRes.data.data.messages;
@@ -156,6 +159,50 @@ export default function QuestPage() {
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
+        {/* Left sidebar — quest & zone info */}
+        <div className="w-56 shrink-0 border-r border-gray-800 overflow-y-auto p-4 space-y-5 hidden lg:block">
+          {questInfo ? (
+            <>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Active Quest</p>
+                <p className="font-bold text-sm text-indigo-300">{questInfo.title}</p>
+                <p className="text-xs text-gray-400 mt-1 leading-relaxed">{questInfo.briefing}</p>
+              </div>
+              <div className="border-t border-gray-800 pt-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Rewards</p>
+                <p className="text-xs text-indigo-400">{questInfo.rewardXp} XP</p>
+                <p className="text-xs text-yellow-400">{questInfo.rewardGold} Gold</p>
+              </div>
+              {questInfo.zone && (
+                <div className="border-t border-gray-800 pt-4">
+                  <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Zone</p>
+                  <p className="text-xs text-gray-300 font-medium">{questInfo.zone.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Threat {questInfo.zone.threatLevel}/5</p>
+                  {questInfo.zone.faction && (
+                    <p className="text-xs mt-0.5" style={{ color: questInfo.zone.faction.color }}>
+                      ⚑ {questInfo.zone.faction.name}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="border-t border-gray-800 pt-4">
+                <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">Quick Actions</p>
+                {['I search the area', 'I talk to someone nearby', 'I check my surroundings', 'I rest and recover'].map(action => (
+                  <button
+                    key={action}
+                    onClick={() => setInput(action)}
+                    className="block w-full text-left text-xs text-gray-400 hover:text-white py-1 hover:bg-gray-800 rounded px-2 transition-colors"
+                  >
+                    {action}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="text-xs text-gray-600">Loading quest...</p>
+          )}
+        </div>
+
         {/* Messages */}
         <div className="flex flex-col flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">

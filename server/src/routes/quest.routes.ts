@@ -91,7 +91,9 @@ const questRoutes: FastifyPluginAsync = async (fastify) => {
     const { sessionId } = req.params as { sessionId: string };
     const session = await prisma.questSession.findUnique({
         where: { id: sessionId },
-        select: { questId: true, status: true },
+        include: {
+          quest: { include: { zone: { include: { faction: true } } } },
+        },
     });
     if (!session) return reply.status(404).send({ success: false, error: 'Session not found', code: 'NOT_FOUND' });
     return reply.send({ success: true, data: session });
