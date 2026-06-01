@@ -20,6 +20,7 @@ export default function QuestPage() {
   const [input, setInput] = useState('');
   const [questId, setQuestId] = useState('');
   const openingFired = useRef(false);
+  const streamTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Socket setup — runs once on mount
@@ -38,12 +39,18 @@ export default function QuestPage() {
 
     socket.on(SOCKET_EVENTS.QUEST_END, (payload: { sessionId: string; cleanText?: string | null }) => {
       if (payload.sessionId !== sessionId) return;
+      if (streamTimeout.current) clearTimeout(streamTimeout.current);
       finalizeNarratorMessage(payload.cleanText);
     });
+
+    // Re-join room after reconnect so chunks aren't lost
+    const handleReconnect = () => socket.emit('quest:join', sessionId);
+    socket.on('reconnect', handleReconnect);
 
     return () => {
       socket.off(SOCKET_EVENTS.QUEST_CHUNK);
       socket.off(SOCKET_EVENTS.QUEST_END);
+      socket.off('reconnect', handleReconnect);
       clearSession();
       openingFired.current = false;
     };
@@ -93,9 +100,13 @@ export default function QuestPage() {
     setInput('');
     addPlayerMessage(text);
     startNarratorMessage();
+
+    streamTimeout.current = setTimeout(() => finalizeNarratorMessage(), 90_000);
+
     try {
       await api.post('/api/v1/quest/input', { sessionId, characterId, questId, input: text });
     } catch {
+      if (streamTimeout.current) clearTimeout(streamTimeout.current);
       finalizeNarratorMessage();
     }
   };

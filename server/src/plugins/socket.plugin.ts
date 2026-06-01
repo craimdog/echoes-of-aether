@@ -12,6 +12,9 @@ declare module 'fastify' {
 const socketPlugin: FastifyPluginAsync = async (fastify: FastifyInstance) => {
   const io = new Server(fastify.server, {
     cors: { origin: env.CLIENT_URL, credentials: true },
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket', 'polling'],
   });
 
   fastify.decorate('io', io);
