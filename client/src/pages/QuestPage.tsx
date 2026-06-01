@@ -129,6 +129,7 @@ export default function QuestPage() {
     if (!sessionId) return;
     await api.post('/api/v1/quest/end', { sessionId }).catch(() => {});
     queryClient.invalidateQueries({ queryKey: ['character', characterId] });
+    queryClient.invalidateQueries({ queryKey: ['active-session', characterId] });
     navigate(`/characters/${characterId}`);
   };
 

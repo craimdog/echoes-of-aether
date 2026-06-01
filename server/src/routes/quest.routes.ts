@@ -68,12 +68,55 @@ const questRoutes: FastifyPluginAsync = async (fastify) => {
         fastify.io.to(`quest:${sessionId}`).emit(SOCKET_EVENTS.QUEST_CHUNK, { sessionId, chunk });
       },
     ).then(async ({ fullText, mutation }) => {
+        // Apply character mutations synchronously so sidebar updates immediately
+        if (mutation && characterId) {
+            const { type, payload } = mutation;
+            if (type === 'QUEST_COMPLETE') {
+                const p = payload as { xpGained?: number; goldGained?: number };
+                if (p.xpGained || p.goldGained) {
+                    const updated = await prisma.character.update({
+                        where: { id: characterId },
+                        data: {
+                            xp: { increment: p.xpGained ?? 0 },
+                            gold: { increment: p.goldGained ?? 0 },
+                        },
+                    });
+                    const xpForNext = updated.level * 150;
+                    if (updated.xp >= xpForNext) {
+                        const CLASS_BASE: Record<string, { hp: number; mp: number }> = {
+                            MAGE: { hp: 60, mp: 120 }, RANGER: { hp: 80, mp: 60 },
+                            PALADIN: { hp: 120, mp: 40 }, ROGUE: { hp: 70, mp: 50 },
+                        };
+                        const base = CLASS_BASE[updated.class] ?? { hp: 10, mp: 10 };
+                        await prisma.character.update({
+                            where: { id: characterId },
+                            data: { level: { increment: 1 }, hp: { increment: Math.floor(base.hp * 0.1) }, mp: { increment: Math.floor(base.mp * 0.1) } },
+                        });
+                    }
+                }
+            } else if (type === 'ITEM_PICKUP') {
+                const p = payload as { item?: string; items?: string[] };
+                const items = p.items ?? (p.item ? p.item.split(',').map(s => s.trim()).filter(Boolean) : []);
+                if (items.length) {
+                    const char = await prisma.character.findUnique({ where: { id: characterId }, select: { inventory: true } });
+                    const inv = Array.isArray(char?.inventory) ? char.inventory as string[] : [];
+                    const newItems = items.filter(i => !inv.includes(i));
+                    if (newItems.length) await prisma.character.update({ where: { id: characterId }, data: { inventory: [...inv, ...newItems] } });
+                }
+            } else if (type === 'HP_CHANGE') {
+                const { delta } = payload as { delta: number };
+                if (typeof delta === 'number') {
+                    const char = await prisma.character.findUnique({ where: { id: characterId }, select: { hp: true } });
+                    if (char) await prisma.character.update({ where: { id: characterId }, data: { hp: Math.max(0, char.hp + delta), isAlive: Math.max(0, char.hp + delta) > 0 } });
+                }
+            }
+        }
+
         fastify.io.to(`quest:${sessionId}`).emit(SOCKET_EVENTS.QUEST_END, { sessionId, mutation, cleanText: fullText });
-        if (mutation) {
-            await worldEventsQueue.add('world-mutation', {
-                mutation,
-                triggeredByCharId: characterId,
-            });
+
+        // Queue world-state mutations for async processing
+        if (mutation && ['FACTION_SHIFT', 'ZONE_THREAT_CHANGE', 'LORE_FRAGMENT'].includes(mutation.type)) {
+            await worldEventsQueue.add('world-mutation', { mutation, triggeredByCharId: characterId });
         }
     }).catch((err) => {
       fastify.log.error(err, 'Quest stream error');
