@@ -150,17 +150,24 @@ export function startWorldEventsWorker(io: Server) {
           break;
         }
         case 'ITEM_PICKUP': {
-          const { item } = payload as { item: string };
-          if (item && triggeredByCharId) {
+          const p = payload as { item?: string; items?: string[] };
+          // Support both single item string and items array
+          const rawItems: string[] = p.items
+            ? p.items
+            : p.item
+              ? p.item.split(',').map(s => s.trim()).filter(Boolean)
+              : [];
+          if (rawItems.length && triggeredByCharId) {
             const character = await prisma.character.findUnique({
               where: { id: triggeredByCharId },
               select: { inventory: true },
             });
             const inventory = Array.isArray(character?.inventory) ? character.inventory as string[] : [];
-            if (!inventory.includes(item)) {
+            const newItems = rawItems.filter(i => !inventory.includes(i));
+            if (newItems.length) {
               await prisma.character.update({
                 where: { id: triggeredByCharId },
-                data: { inventory: [...inventory, item] },
+                data: { inventory: [...inventory, ...newItems] },
               });
             }
           }

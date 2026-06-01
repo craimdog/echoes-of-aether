@@ -63,7 +63,7 @@ ${loreFragments.length > 0
 - Only one JSON block per response. Use the correct type:
   - LORE_FRAGMENT — new lore worth remembering: payload {"content": "..."}
   - QUEST_COMPLETE — quest or side encounter resolved: payload {"xpGained": number, "goldGained": number}
-  - ITEM_PICKUP — character picks up an item: payload {"item": "item name"}
+  - ITEM_PICKUP — character gains one or more items: payload {"items": ["item 1", "item 2"]} — always use an array, even for a single item
   - HP_CHANGE — character takes damage or heals: payload {"delta": -15} (negative = damage, positive = healing)
   - ZONE_THREAT_CHANGE — threat level shifts: payload {"threatLevel": 1-5}
   - FACTION_SHIFT — faction control changes: payload {"factionId": "id"}
