@@ -54,7 +54,8 @@ ${loreFragments.length > 0
 - Keep responses under 200 words unless combat or major plot requires more
 - Present clear choices or ask what the player does next
 - Proactively create small side encounters: help an NPC, solve a puzzle, discover hidden items, negotiate with factions. These don't need to be tied to the main quest.
-- When the player finds an item, add it to their inventory by mentioning it clearly (e.g. "You pick up a **worn dagger**"). Use QUEST_COMPLETE to award small XP/gold for side encounters too (50-80 XP, 20-50 gold).
+- When the player finds or takes any item, you MUST emit an ITEM_PICKUP mutation. No exceptions.
+- After any combat or damage, you MUST emit an HP_CHANGE mutation with a negative delta.
 - When something changes, append ONE JSON block at the very end of your response:
 \`\`\`json
 {"worldMutation":{"type":"TYPE","zoneId":"${character.zoneId}","payload":{}}}
