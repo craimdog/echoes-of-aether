@@ -86,19 +86,22 @@ export default function WorldMapPage() {
                 {/* World events feed */}
                 <div>
                     <h2 className="text-lg font-bold mb-4">World Events</h2>
-                    <div className="space-y-2">
+                    <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
                         {liveEvents.map((e, i) => (
                             <div key={`live-${i}`} className="bg-indigo-950 border border-indigo-800 rounded-lg px-3 py-2 text-xs">
                                 <span className="text-indigo-400 font-semibold">{e.zoneName}: </span>
                                 <span className="text-gray-300">{e.description}</span>
                             </div>
                         ))}
-                        {eventsData?.map((e: any) => (
-                            <div key={e.id} className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs">
-                                <span className="text-gray-400 font-semibold">{e.zone?.name}:</span>
-                                <span className="text-gray-400">{e.description}</span>
-                            </div>
-                        ))}
+                        {eventsData
+                            ?.filter((e: any) => !liveEvents.some(le => le.description === e.description))
+                            .slice(0, 20 - liveEvents.length)
+                            .map((e: any) => (
+                                <div key={e.id} className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs">
+                                    <span className="text-gray-400 font-semibold">{e.zone?.name}: </span>
+                                    <span className="text-gray-400">{e.description}</span>
+                                </div>
+                            ))}
                         {!liveEvents.length && !eventsData?.length && (
                             <p className="text-gray-600 text-sm">No world events yet.</p>
                         )}
