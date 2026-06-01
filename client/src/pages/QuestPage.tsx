@@ -60,13 +60,14 @@ export default function QuestPage() {
       queryClient.invalidateQueries({ queryKey: ['character', characterId] });
     });
 
-    const handleReconnect = () => socket.emit('quest:join', sessionId);
-    socket.on('reconnect', handleReconnect);
+    // 'connect' fires on initial connection AND every reconnection
+    const handleConnect = () => socket.emit('quest:join', sessionId);
+    socket.on('connect', handleConnect);
 
     return () => {
       socket.off(SOCKET_EVENTS.QUEST_CHUNK);
       socket.off(SOCKET_EVENTS.QUEST_END);
-      socket.off('reconnect', handleReconnect);
+      socket.off('connect', handleConnect);
       clearSession();
       openingFired.current = false;
     };
@@ -113,6 +114,8 @@ export default function QuestPage() {
     setInput('');
     addPlayerMessage(text);
     startNarratorMessage();
+    // Ensure still in the room before sending
+    getSocket().emit('quest:join', sessionId);
     streamTimeout.current = setTimeout(() => finalizeNarratorMessage(), 90_000);
     try {
       await api.post('/api/v1/quest/input', { sessionId, characterId, questId, input: text });
