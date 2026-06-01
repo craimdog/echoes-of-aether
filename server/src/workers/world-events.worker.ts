@@ -144,6 +144,40 @@ export function startWorldEventsWorker(io: Server) {
           }
           break;
         }
+        case 'ITEM_PICKUP': {
+          const { item } = payload as { item: string };
+          if (item && triggeredByCharId) {
+            const character = await prisma.character.findUnique({
+              where: { id: triggeredByCharId },
+              select: { inventory: true },
+            });
+            const inventory = Array.isArray(character?.inventory) ? character.inventory as string[] : [];
+            if (!inventory.includes(item)) {
+              await prisma.character.update({
+                where: { id: triggeredByCharId },
+                data: { inventory: [...inventory, item] },
+              });
+            }
+          }
+          break;
+        }
+        case 'HP_CHANGE': {
+          const { delta } = payload as { delta: number };
+          if (typeof delta === 'number' && triggeredByCharId) {
+            const character = await prisma.character.findUnique({
+              where: { id: triggeredByCharId },
+              select: { hp: true },
+            });
+            if (character) {
+              const newHp = Math.max(0, character.hp + delta);
+              await prisma.character.update({
+                where: { id: triggeredByCharId },
+                data: { hp: newHp, isAlive: newHp > 0 },
+              });
+            }
+          }
+          break;
+        }
       }
 
       await prisma.worldEvent.update({ where: { id: worldEvent.id }, data: { processed: true } });

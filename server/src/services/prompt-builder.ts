@@ -55,13 +55,17 @@ ${loreFragments.length > 0
 - Present clear choices or ask what the player does next
 - Proactively create small side encounters: help an NPC, solve a puzzle, discover hidden items, negotiate with factions. These don't need to be tied to the main quest.
 - When the player finds an item, add it to their inventory by mentioning it clearly (e.g. "You pick up a **worn dagger**"). Use QUEST_COMPLETE to award small XP/gold for side encounters too (50-80 XP, 20-50 gold).
-- When a significant world mutation occurs, append a JSON block at the very end of your response:
+- When something changes, append ONE JSON block at the very end of your response:
 \`\`\`json
-{"worldMutation":{"type":"FACTION_SHIFT|ZONE_THREAT_CHANGE|LORE_FRAGMENT|QUEST_COMPLETE","zoneId":"${character.zoneId}","payload":{}}}
+{"worldMutation":{"type":"TYPE","zoneId":"${character.zoneId}","payload":{}}}
 \`\`\`
-- Only include ONE JSON block per response, only when something truly changes.
-- LORE_FRAGMENT payload: {"content": "lore text to permanently record"}
-- QUEST_COMPLETE payload: {"xpGained": number, "goldGained": number} — use for both main quest completion AND side encounters
-- ZONE_THREAT_CHANGE payload: {"threatLevel": 1-5}
-- FACTION_SHIFT payload: {"factionId": "id of the faction now in control"}`;
+- Only one JSON block per response. Use the correct type:
+  - LORE_FRAGMENT — new lore worth remembering: payload {"content": "..."}
+  - QUEST_COMPLETE — quest or side encounter resolved: payload {"xpGained": number, "goldGained": number}
+  - ITEM_PICKUP — character picks up an item: payload {"item": "item name"}
+  - HP_CHANGE — character takes damage or heals: payload {"delta": -15} (negative = damage, positive = healing)
+  - ZONE_THREAT_CHANGE — threat level shifts: payload {"threatLevel": 1-5}
+  - FACTION_SHIFT — faction control changes: payload {"factionId": "id"}
+- Use ITEM_PICKUP every time the character finds or takes an item. Use HP_CHANGE after combat or hazards.
+- Current character HP: ${character.hp}`;
 }

@@ -7,7 +7,9 @@ export type WorldMutationType =
     | 'FACTION_SHIFT'
     | 'ZONE_THREAT_CHANGE'
     | 'LORE_FRAGMENT'
-    | 'QUEST_COMPLETE';
+    | 'QUEST_COMPLETE'
+    | 'ITEM_PICKUP'
+    | 'HP_CHANGE';
 
 export interface AuthUser {
     id: string;

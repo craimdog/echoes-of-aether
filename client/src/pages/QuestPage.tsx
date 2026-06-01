@@ -56,6 +56,7 @@ export default function QuestPage() {
       if (payload.sessionId !== sessionId) return;
       if (streamTimeout.current) clearTimeout(streamTimeout.current);
       finalizeNarratorMessage(payload.cleanText);
+      queryClient.invalidateQueries({ queryKey: ['character', characterId] });
     });
 
     const handleReconnect = () => socket.emit('quest:join', sessionId);
@@ -130,7 +131,7 @@ export default function QuestPage() {
   const xpProgress = character ? Math.min(100, Math.round((character.xp / xpForNext) * 100)) : 0;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+    <div className="h-screen bg-gray-950 text-white flex flex-col overflow-hidden">
       {/* Header */}
       <header className="border-b border-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
         <h1 className="text-indigo-400 font-bold">Echoes of Aether</h1>
