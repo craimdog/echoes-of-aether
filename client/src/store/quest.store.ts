@@ -23,7 +23,7 @@ export const useQuestStore = create<QuestState>((set) => ({
     messages: [],
     streaming: false,
 
-    setSession: (id) => set({ sessionId: id, messages: [] }),
+    setSession: (id) => set({ sessionId: id }),
     clearSession: () => set({ sessionId: null, messages: [], streaming: false }),
 
     addPlayerMessage: (content) =>

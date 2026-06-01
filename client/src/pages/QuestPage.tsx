@@ -68,14 +68,14 @@ export default function QuestPage() {
       const history: { role: 'user' | 'assistant'; content: string }[] = histRes.data.data.messages;
 
       if (history.length > 0) {
-        // Restore previous messages — no opening narration needed
         const restored = history.map(m => ({
-          role: m.role === 'user' ? 'player' : 'narrator' as 'player' | 'narrator',
+          role: (m.role === 'user' ? 'player' : 'narrator') as 'player' | 'narrator',
           content: m.content,
         }));
-        useQuestStore.setState({ messages: restored });
+        useQuestStore.setState({ messages: restored, streaming: false });
       } else {
-        // Fresh session — fire opening narration
+        // Fresh session — clear any stale messages and fire opening narration
+        useQuestStore.setState({ messages: [], streaming: false });
         if (openingFired.current) return;
         openingFired.current = true;
         startNarratorMessage();
