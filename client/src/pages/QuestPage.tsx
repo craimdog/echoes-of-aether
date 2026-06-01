@@ -133,6 +133,15 @@ export default function QuestPage() {
   const xpForNext = character ? character.level * 150 : 150;
   const xpProgress = character ? Math.min(100, Math.round((character.xp / xpForNext) * 100)) : 0;
 
+  const CLASS_BASE: Record<string, { hp: number; mp: number }> = {
+    MAGE: { hp: 60, mp: 120 }, RANGER: { hp: 80, mp: 60 },
+    PALADIN: { hp: 120, mp: 40 }, ROGUE: { hp: 70, mp: 50 },
+  };
+  const base = character ? (CLASS_BASE[character.class] ?? { hp: 60, mp: 50 }) : { hp: 60, mp: 50 };
+  const lvl = character?.level ?? 1;
+  const maxHp = base.hp + (lvl - 1) * Math.floor(base.hp * 0.1);
+  const maxMp = base.mp + (lvl - 1) * Math.floor(base.mp * 0.1);
+
   return (
     <div className="h-screen bg-gray-950 text-white flex flex-col overflow-hidden">
       {/* Header */}
@@ -267,8 +276,8 @@ export default function QuestPage() {
 
             {/* Stats */}
             <div className="space-y-2">
-              <StatBar label="HP" value={character.hp} max={character.hp} color="bg-green-500" />
-              <StatBar label="MP" value={character.mp} max={character.mp} color="bg-blue-500" />
+              <StatBar label="HP" value={character.hp} max={maxHp} color="bg-green-500" />
+              <StatBar label="MP" value={character.mp} max={maxMp} color="bg-blue-500" />
               <div>
                 <div className="flex justify-between text-xs text-gray-400 mb-1">
                   <span>XP</span>
@@ -320,7 +329,7 @@ function StatBar({ label, value, max, color }: { label: string; value: number; m
     <div>
       <div className="flex justify-between text-xs text-gray-400 mb-1">
         <span>{label}</span>
-        <span>{value}</span>
+        <span>{value} / {max}</span>
       </div>
       <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
         <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
