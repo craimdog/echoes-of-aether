@@ -101,3 +101,38 @@ export async function streamQuestResponse(
 
     return { fullText: clean, mutation };
 }
+
+export async function generateQuest(
+    zoneName: string,
+    zoneLore: string,
+    threatLevel: number,
+    factionName: string | null,
+    triggerEvent: string,
+): Promise<{ title: string; briefing: string; rewardXp: number; rewardGold: number } | null> {
+    try {
+        const response = await anthropic.messages.create({
+            model: 'claude-sonnet-4-6',
+            max_tokens: 300,
+            messages: [{
+                role: 'user',
+                content: `You are generating a new quest for a dark fantasy RPG zone.
+
+Zone: ${zoneName}
+Lore: ${zoneLore}
+Threat Level: ${threatLevel}/5
+Controlling Faction: ${factionName ?? 'None'}
+Recent World Event: ${triggerEvent}
+
+Generate a quest directly inspired by the world event above. Return ONLY valid JSON, no other text:
+{"title":"...","briefing":"...","rewardXp":number,"rewardGold":number}
+
+rewardXp should be 60-180, rewardGold should be 40-120. Make the briefing 1-2 sentences, atmospheric and specific to the event.`,
+            }],
+        });
+
+        const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
+        return JSON.parse(text);
+    } catch {
+        return null;
+    }
+}

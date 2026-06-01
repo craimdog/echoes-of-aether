@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import { prisma } from '../lib/prisma.js';
 import type { WorldMutationJobData } from '../jobs/world-mutation.job.js';
 import type { Server } from 'socket.io';
+import { generateQuest } from '../services/ai.service.js';
 
 const CLASS_HP_MP: Record<string, { hp: number; mp: number }> = {
   MAGE:    { hp: 60,  mp: 120 },
@@ -61,16 +62,42 @@ export function startWorldEventsWorker(io: Server) {
       switch (type) {
         case 'FACTION_SHIFT': {
           const { factionId } = payload as { factionId: string };
-          await prisma.zone.update({
+          const updatedZone = await prisma.zone.update({
             where: { id: zoneId },
             data: { factionControlId: factionId ?? null },
+            include: { faction: true },
           });
+          // Generate a new quest spawned by this faction shift
+          const newFaction = await prisma.faction.findUnique({ where: { id: factionId } });
+          const quest = await generateQuest(
+            updatedZone.name, updatedZone.lore, updatedZone.threatLevel,
+            newFaction?.name ?? null, worldEvent.description,
+          );
+          if (quest) {
+            await prisma.quest.create({
+              data: { zoneId, title: quest.title, briefing: quest.briefing, rewardXp: quest.rewardXp, rewardGold: quest.rewardGold },
+            });
+          }
           break;
         }
         case 'ZONE_THREAT_CHANGE': {
           const { threatLevel } = payload as { threatLevel: number };
           if (typeof threatLevel === 'number' && threatLevel >= 1 && threatLevel <= 5) {
-            await prisma.zone.update({ where: { id: zoneId }, data: { threatLevel } });
+            const updatedZone = await prisma.zone.update({
+              where: { id: zoneId },
+              data: { threatLevel },
+              include: { faction: true },
+            });
+            // Generate a new quest reflecting the changed threat level
+            const quest = await generateQuest(
+              updatedZone.name, updatedZone.lore, threatLevel,
+              updatedZone.faction?.name ?? null, worldEvent.description,
+            );
+            if (quest) {
+              await prisma.quest.create({
+                data: { zoneId, title: quest.title, briefing: quest.briefing, rewardXp: quest.rewardXp, rewardGold: quest.rewardGold },
+              });
+            }
           }
           break;
         }

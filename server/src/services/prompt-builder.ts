@@ -53,11 +53,15 @@ ${loreFragments.length > 0
 - Write immersive, atmospheric narrative in second person ("You enter...")
 - Keep responses under 200 words unless combat or major plot requires more
 - Present clear choices or ask what the player does next
-- When a significant world mutation occurs, append a JSON block at the very end:
+- Proactively create small side encounters: help an NPC, solve a puzzle, discover hidden items, negotiate with factions. These don't need to be tied to the main quest.
+- When the player finds an item, add it to their inventory by mentioning it clearly (e.g. "You pick up a **worn dagger**"). Use QUEST_COMPLETE to award small XP/gold for side encounters too (50-80 XP, 20-50 gold).
+- When a significant world mutation occurs, append a JSON block at the very end of your response:
 \`\`\`json
 {"worldMutation":{"type":"FACTION_SHIFT|ZONE_THREAT_CHANGE|LORE_FRAGMENT|QUEST_COMPLETE","zoneId":"${character.zoneId}","payload":{}}}
 \`\`\`
-- Only include the JSON block when something meaningful changes. Never fabricate it.
-- For LORE_FRAGMENT mutations, set payload to: {"content": "the lore text to store"}
-- For QUEST_COMPLETE mutations, set payload to: {"xpGained": ${quest.rewardXp}, "goldGained": ${quest.rewardGold}}`;
+- Only include ONE JSON block per response, only when something truly changes.
+- LORE_FRAGMENT payload: {"content": "lore text to permanently record"}
+- QUEST_COMPLETE payload: {"xpGained": number, "goldGained": number} — use for both main quest completion AND side encounters
+- ZONE_THREAT_CHANGE payload: {"threatLevel": 1-5}
+- FACTION_SHIFT payload: {"factionId": "id of the faction now in control"}`;
 }

@@ -6,7 +6,11 @@ import { useQuestStore } from '../store/quest.store';
 import { SOCKET_EVENTS } from '@aether/shared';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+const CLASS_COLORS: Record<string, string> = {
+  MAGE: 'text-blue-400', RANGER: 'text-green-400', PALADIN: 'text-yellow-400', ROGUE: 'text-purple-400',
+};
 
 export default function QuestPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -19,9 +23,20 @@ export default function QuestPage() {
 
   const [input, setInput] = useState('');
   const [questId, setQuestId] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const openingFired = useRef(false);
   const streamTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const { data: character } = useQuery({
+    queryKey: ['character', characterId],
+    queryFn: async () => {
+      const res = await api.get(`/api/v1/characters/${characterId}`);
+      return res.data.data.character as any;
+    },
+    enabled: !!characterId,
+    refetchInterval: 30_000,
+  });
 
   // Socket setup — runs once on mount
   useEffect(() => {
@@ -43,7 +58,6 @@ export default function QuestPage() {
       finalizeNarratorMessage(payload.cleanText);
     });
 
-    // Re-join room after reconnect so chunks aren't lost
     const handleReconnect = () => socket.emit('quest:join', sessionId);
     socket.on('reconnect', handleReconnect);
 
@@ -56,14 +70,13 @@ export default function QuestPage() {
     };
   }, [sessionId]);
 
-  // Fetch questId, then fire opening narration exactly once
+  // Fetch questId then fire opening narration or restore history
   useEffect(() => {
     if (!sessionId) return;
     api.get(`/api/v1/quest/${sessionId}`).then(async res => {
       const qId = res.data.data.questId as string;
       setQuestId(qId);
 
-      // Load existing message history
       const histRes = await api.get(`/api/v1/quest/${sessionId}/messages`);
       const history: { role: 'user' | 'assistant'; content: string }[] = histRes.data.data.messages;
 
@@ -74,21 +87,17 @@ export default function QuestPage() {
         }));
         useQuestStore.setState({ messages: restored, streaming: false });
       } else {
-        // Fresh session — clear any stale messages and fire opening narration
         useQuestStore.setState({ messages: [], streaming: false });
         if (openingFired.current) return;
         openingFired.current = true;
         startNarratorMessage();
         api.post('/api/v1/quest/input', {
-          sessionId,
-          characterId,
-          questId: qId,
+          sessionId, characterId, questId: qId,
           input: 'Begin the quest. Set the scene and describe where my character is and what they see.',
         }).catch(() => finalizeNarratorMessage());
       }
     }).catch(() => {});
   }, [sessionId]);
-
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -100,9 +109,7 @@ export default function QuestPage() {
     setInput('');
     addPlayerMessage(text);
     startNarratorMessage();
-
     streamTimeout.current = setTimeout(() => finalizeNarratorMessage(), 90_000);
-
     try {
       await api.post('/api/v1/quest/input', { sessionId, characterId, questId, input: text });
     } catch {
@@ -118,69 +125,157 @@ export default function QuestPage() {
     navigate(`/characters/${characterId}`);
   };
 
+  const inventory: string[] = Array.isArray(character?.inventory) ? character.inventory : [];
+  const xpForNext = character ? character.level * 150 : 150;
+  const xpProgress = character ? Math.min(100, Math.round((character.xp / xpForNext) * 100)) : 0;
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       {/* Header */}
-      <header className="border-b border-gray-800 px-6 py-3 flex items-center justify-between shrink-0">
+      <header className="border-b border-gray-800 px-4 py-3 flex items-center justify-between shrink-0">
         <h1 className="text-indigo-400 font-bold">Echoes of Aether</h1>
-        <button onClick={handleEnd} className="text-sm text-gray-400 hover:text-white transition-colors">
-          End Quest
-        </button>
-      </header>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4 max-w-3xl w-full mx-auto">
-        {messages.map((msg, i) => (
-          <div key={i} className={msg.role === 'player' ? 'flex justify-end' : 'flex justify-start'}>
-            <div className={`max-w-[80%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
-              msg.role === 'player'
-                ? 'bg-indigo-700 text-white'
-                : 'bg-gray-800 text-gray-100'
-            }`}>
-              {msg.role === 'narrator' ? (
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
-                    h2: ({children}) => <h2 className="text-base font-bold mb-1">{children}</h2>,
-                    strong: ({children}) => <strong className="font-bold text-white">{children}</strong>,
-                    em: ({children}) => <em className="italic text-gray-300">{children}</em>,
-                    hr: () => <hr className="border-gray-600 my-2" />,
-                    p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
-                  }}
-                >
-                  {msg.content}
-                </ReactMarkdown>
-              ) : msg.content}
-              {msg.streaming && <span className="inline-block w-1.5 h-4 bg-gray-400 ml-1 animate-pulse align-middle" />}
-            </div>
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-
-      {/* Input */}
-      <div className="border-t border-gray-800 px-4 py-4 shrink-0">
-        <div className="max-w-3xl mx-auto flex gap-3">
-          <input
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
-            disabled={streaming}
-            placeholder={streaming ? 'The Dungeon Master is narrating...' : 'What do you do?'}
-            className="flex-1 bg-gray-800 text-white rounded-lg px-4 py-2.5 border border-gray-700 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
-          />
+        <div className="flex items-center gap-3">
           <button
-            onClick={handleSend}
-            disabled={streaming || !input.trim()}
-            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold rounded-lg px-5 py-2.5 transition-colors"
+            onClick={() => setSidebarOpen(o => !o)}
+            className="text-sm text-gray-400 hover:text-white transition-colors"
           >
-            Send
+            {sidebarOpen ? 'Hide Stats' : 'Show Stats'}
+          </button>
+          <button
+            onClick={() => navigate(`/characters/${characterId}`)}
+            className="text-sm text-gray-400 hover:text-white transition-colors"
+          >
+            Save & Exit
+          </button>
+          <button onClick={handleEnd} className="text-sm text-red-400 hover:text-red-300 transition-colors">
+            End Quest
           </button>
         </div>
+      </header>
+
+      {/* Body */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Messages */}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+            {messages.map((msg, i) => (
+              <div key={i} className={msg.role === 'player' ? 'flex justify-end' : 'flex justify-start'}>
+                <div className={`max-w-[85%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
+                  msg.role === 'player' ? 'bg-indigo-700 text-white' : 'bg-gray-800 text-gray-100'
+                }`}>
+                  {msg.role === 'narrator' ? (
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        h1: ({children}) => <h1 className="text-lg font-bold mb-2">{children}</h1>,
+                        h2: ({children}) => <h2 className="text-base font-bold mb-1">{children}</h2>,
+                        strong: ({children}) => <strong className="font-bold text-white">{children}</strong>,
+                        em: ({children}) => <em className="italic text-gray-300">{children}</em>,
+                        hr: () => <hr className="border-gray-600 my-2" />,
+                        p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  ) : msg.content}
+                  {msg.streaming && <span className="inline-block w-1.5 h-4 bg-gray-400 ml-1 animate-pulse align-middle" />}
+                </div>
+              </div>
+            ))}
+            <div ref={bottomRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-gray-800 px-4 py-3 shrink-0">
+            <div className="flex gap-3">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                disabled={streaming}
+                placeholder={streaming ? 'The Dungeon Master is narrating...' : 'What do you do?'}
+                className="flex-1 bg-gray-800 text-white rounded-lg px-4 py-2.5 border border-gray-700 focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+              />
+              <button
+                onClick={handleSend}
+                disabled={streaming || !input.trim()}
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold rounded-lg px-5 py-2.5 transition-colors"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar */}
+        {sidebarOpen && character && (
+          <div className="w-64 shrink-0 border-l border-gray-800 overflow-y-auto p-4 space-y-4 hidden lg:block">
+            {/* Character */}
+            <div>
+              <p className="font-bold text-sm">{character.name}</p>
+              <p className={`text-xs ${CLASS_COLORS[character.class]}`}>{character.class} · Level {character.level}</p>
+            </div>
+
+            {/* Stats */}
+            <div className="space-y-2">
+              <StatBar label="HP" value={character.hp} max={character.hp} color="bg-green-500" />
+              <StatBar label="MP" value={character.mp} max={character.mp} color="bg-blue-500" />
+              <div>
+                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                  <span>XP</span>
+                  <span>{character.xp} / {xpForNext}</span>
+                </div>
+                <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${xpProgress}%` }} />
+                </div>
+              </div>
+            </div>
+
+            {/* Gold */}
+            <div className="bg-gray-900 rounded-lg px-3 py-2 flex items-center justify-between">
+              <span className="text-xs text-gray-400">Gold</span>
+              <span className="text-yellow-400 font-bold text-sm">{character.gold}</span>
+            </div>
+
+            {/* Zone */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Current Zone</p>
+              <p className="text-xs text-gray-300">{character.zone?.name}</p>
+            </div>
+
+            {/* Inventory */}
+            <div>
+              <p className="text-xs text-gray-500 mb-2">Inventory</p>
+              {inventory.length === 0 ? (
+                <p className="text-xs text-gray-600 italic">Empty</p>
+              ) : (
+                <ul className="space-y-1">
+                  {inventory.map((item: string, i: number) => (
+                    <li key={i} className="text-xs text-gray-300 bg-gray-900 rounded px-2 py-1">
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function StatBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  return (
+    <div>
+      <div className="flex justify-between text-xs text-gray-400 mb-1">
+        <span>{label}</span>
+        <span>{value}</span>
+      </div>
+      <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">
+        <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
       </div>
     </div>
   );
