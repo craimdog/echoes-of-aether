@@ -28,7 +28,7 @@ function describeMutation(type: string, payload: Record<string, unknown>): strin
   switch (type) {
     case 'FACTION_SHIFT':      return `Faction control shifted in this zone.`;
     case 'ZONE_THREAT_CHANGE': return `Zone threat level changed to ${payload.threatLevel}.`;
-    case 'LORE_FRAGMENT':      return `New lore discovered: ${String(payload.content ?? '').slice(0, 80)}`;
+    case 'LORE_FRAGMENT':      return `New lore: ${String(payload.content ?? '')}`;
     case 'QUEST_COMPLETE':     return `A quest was completed.`;
     default:                   return `World event: ${type}`;
   }
@@ -104,7 +104,12 @@ export function startWorldEventsWorker(io: Server) {
         case 'LORE_FRAGMENT': {
           const { content } = payload as { content: string };
           if (content) {
-            await prisma.loreFragment.create({ data: { zoneId, content } });
+            const existing = await prisma.loreFragment.findFirst({
+              where: { zoneId, content },
+            });
+            if (!existing) {
+              await prisma.loreFragment.create({ data: { zoneId, content } });
+            }
           }
           break;
         }

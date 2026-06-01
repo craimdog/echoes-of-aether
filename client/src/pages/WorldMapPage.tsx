@@ -95,6 +95,7 @@ export default function WorldMapPage() {
                         ))}
                         {eventsData
                             ?.filter((e: any) => !liveEvents.some(le => le.description === e.description))
+                            .filter((e: any, i: number, arr: any[]) => arr.findIndex((x: any) => x.description === e.description) === i)
                             .slice(0, 20 - liveEvents.length)
                             .map((e: any) => (
                                 <div key={e.id} className="bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs">
